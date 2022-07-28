@@ -480,7 +480,7 @@ class BaseNode(object):  # pylint: disable=too-many-instance-attributes,too-many
         orig_log_path = os.path.join(self.logdir, 'database.log')
 
         if Setup.RSYSLOG_ADDRESS:
-            rsys_log_path = os.path.join(Setup.logdir(), 'hosts', self.short_hostname, 'messages.log')
+            rsys_log_path = os.path.join(Setup.logdir(), 'hosts', self.short_hostname, 'messages')
             if os.path.exists(rsys_log_path) and (not os.path.islink(orig_log_path)):
                 os.symlink(os.path.relpath(rsys_log_path, self.logdir), orig_log_path)
             return rsys_log_path
