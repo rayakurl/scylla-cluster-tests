@@ -309,6 +309,11 @@ class ScyllaYaml(BaseModel):  # pylint: disable=too-few-public-methods
     ldap_bind_passwd: str = None
     ldap_url_template: str = None
     saslauthd_socket_path: str = None
+    audit: str = "none"
+    audit_categories: str = ""
+    audit_keyspaces: str = ""
+    audit_tables: str = ""
+
 
     def dict(  # pylint: disable=arguments-differ
         self,

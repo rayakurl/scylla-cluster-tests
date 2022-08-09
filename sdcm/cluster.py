@@ -1575,7 +1575,8 @@ class BaseNode(AutoSshContainerMixin, WebDriverContainerMixin):  # pylint: disab
                     explicit=['partitioner', 'commitlog_sync', 'commitlog_sync_period_in_ms', 'endpoint_snitch']
                 )
             )
-            LOGGER.debug("%s: scylla.yaml will be updated to:\n%s", self, scylla_yaml)
+            #todo replace warning with debug
+            LOGGER.warning("%s: scylla.yaml will be updated to:\n%s", self, scylla_yaml)
 
     def remote_manager_yaml(self):
         return self._remote_yaml(path=SCYLLA_MANAGER_YAML_PATH)
