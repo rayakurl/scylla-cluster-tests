@@ -313,6 +313,10 @@ class ScyllaYaml(BaseModel):  # pylint: disable=too-few-public-methods
     system_key_directory: str = None
     system_info_encryption: dict = None
     kmip_hosts: dict = None
+    audit: str = "none"
+    audit_categories: str = ""
+    audit_keyspaces: str = ""
+    audit_tables: str = ""
 
     def dict(  # pylint: disable=arguments-differ
         self,

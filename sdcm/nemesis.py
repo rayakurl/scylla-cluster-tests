@@ -3565,6 +3565,91 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
         assert not [dc for dc in datacenters if dc.endswith("_nemesis_dc")], "new datacenter was not unregistered"
         self._verify_multi_dc_keyspace_data(consistency_level="QUORUM")
 
+    def _update_audit_parameters_in_scylla_yaml(self, update_dict: dict) -> None:
+        for node in self.cluster.nodes:
+            self.log.info("[raya] update_dict is {0}".format(update_dict))
+            with node.remote_scylla_yaml() as scylla_yaml:
+                self.log.info("[raya] scylla yaml before update: {0} node {1}".format(scylla_yaml, node.name))
+                scylla_yaml.update(update_dict)
+                self.log.info("[raya] scylla yaml after update: {0} node {1}".format(scylla_yaml, node.name))
+                node.restart_scylla_server(verify_up_before=True, verify_up_after=True)
+                self.log.info("[raya] after restart on node {0}".format(node.name))
+
+    def disrupt_toggle_auditing_state(self) -> None:
+        """Manipulate auditing feature settings
+
+        Toggle the selected parameter state (True/False)
+        """
+        self.log.info('Auditing Nemesis begin')
+        '''
+        0. If not enterprise - raise "UnsupportedNemesis". v
+        1. Check if auditing is enabled or disabled.
+        2. If disabled:
+        2.1  Enable (audit: "table", audit_keyspaces: all_the_keysapces_We_have_in the test, audit_categories: ALL)
+        * keyspaces: Comma-separated list of keyspaces that should be audited. You must specify at least one keyspace. 
+            If you leave this option empty, no keyspace will be audited.
+        * To audit all the tables in a keyspace, 
+            set the audit_keyspaces with the keyspace you want to audit and leave audit_tables empty.
+        2.2 Wait X time (we need to define X)
+        2.3 Query the auditing table to make sure it contains something relevant.
+        2.4 Change the auditing_categories to include only "AUTH, DDL, DCL, ADMIN".
+        2.5 Execute alter command that create table, truncate, then drop.
+        2.6 Check that the auditing table contains the actions above.
+        2.7 (Finish - leave it enabled)."AUTH, DDL, DCL, ADMIN"
+
+        3. Else: Disable Auditing.
+        '''
+        if not self.target_node.is_enterprise:
+            raise UnsupportedNemesis('Auditing feature is supported only for enterprise. Skipping the test')
+
+        # need to make sure that there is a keyspace with a table filled with data
+        keyspaces = self.cluster.get_test_keyspaces()
+        self.log.info("[raya] keyspaces: {0}, keyspaces type: {1}".format(keyspaces, type(keyspaces)))
+        if not keyspaces:
+            raise NoKeyspaceFound('No user keyspaces were found. Skipping the test')
+
+        # check audit feature state on first node
+        with self.target_node.remote_scylla_yaml() as scylla_yaml:
+            self.log.info("[raya] scylla_yaml on first node before update: {0}".format(scylla_yaml))
+            self.log.info("[raya] scylla_yaml.audit is {0}".format(scylla_yaml.audit))
+            # audit_state = False if scylla_yaml.audit is None else True
+            audit_state = False if scylla_yaml.audit == 'none' else True
+            self.log.info("[raya] audit state on first node is {}".format(audit_state))
+        # audit_state = False
+
+        audit_enabled_dict_for_scylla_yaml_1 = \
+            {"audit": "table", "audit_categories": "AUTH,DML,DDL,DCL,QUERY,ADMIN",
+             "audit_keyspaces": f"{keyspaces}", "audit_tables": ""}
+
+        audit_enabled_dict_for_scylla_yaml_2 = {"audit": "table", "audit_categories": "AUTH,DDL,DCL,ADMIN",
+                                                "audit_keyspaces": f"{keyspaces}", "audit_tables": ""}
+
+        audit_disabled_dict_for_scylla_yaml = {"audit": "none"}
+
+        # check if auditing is disabled
+        if not audit_state:
+            self.log.info("[raya] inside if")
+            self._update_audit_parameters_in_scylla_yaml(audit_enabled_dict_for_scylla_yaml_1)
+
+            self.log.info("[raya] sleeping 300 seconds")
+            time.sleep(300)
+
+            query_audit_table = f"SELECT * FROM audit.audit_log"
+            result = self.target_node.run_cqlsh(query_audit_table)
+            self.log.info("[raya] result of query audit table is {0}".format(result))
+            if '(0 rows)' in result.stdout:
+                self.log.warning("[raya] 0 rows in audit table!")
+            # else:
+            #     self.log.debug('Key %s already exists before refresh', key)
+
+            self.log.info("[raya] second scylla yaml change")
+            self._update_audit_parameters_in_scylla_yaml(audit_enabled_dict_for_scylla_yaml_2)
+
+        # else - need to disable audiing
+        else:
+            self.log.info("[raya] inside else")
+            self._update_audit_parameters_in_scylla_yaml(audit_disabled_dict_for_scylla_yaml)
+
 
 def disrupt_method_wrapper(method):  # pylint: disable=too-many-statements
     """
@@ -4719,3 +4804,11 @@ class StartStopValidationCompaction(Nemesis):
 
     def disrupt(self):
         self.disrupt_start_stop_validation_compaction()
+
+class ToggleAuditingState(Nemesis):
+    disruptive = True
+    logging.info("[Raya] inside ToggleAuditingState class")
+
+    def disrupt(self):
+        logging.info("[Raya] inside ToggleAuditingState class def disrupt")
+        self.disrupt_toggle_auditing_state()
