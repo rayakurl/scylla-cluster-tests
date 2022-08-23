@@ -3567,20 +3567,9 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
     def _update_audit_parameters_in_scylla_yaml(self, update_dict: dict) -> None:
         for node in self.cluster.nodes:
-            self.log.info("[raya] update_dict is {0}".format(update_dict))
             with node.remote_scylla_yaml() as scylla_yaml:
-                self.log.info("[raya] scylla yaml before update: "
-                              "audit = {0} categories = {1} keyspaces = {2} tables = {3} node {4}"
-                              .format(scylla_yaml.audit, scylla_yaml.audit_categories, scylla_yaml.audit_keyspaces,
-                                      scylla_yaml.audit_tables, node.name))
                 scylla_yaml.update(update_dict)
-                self.log.info(
-                    "[raya] scylla yaml after update: audit = {0} categories = {1} keyspaces = {2} tables = {3} node "
-                    "{4} "
-                    .format(scylla_yaml.audit, scylla_yaml.audit_categories, scylla_yaml.audit_keyspaces,
-                            scylla_yaml.audit_tables, node.name))
                 node.restart_scylla_server(verify_up_before=True, verify_up_after=True)
-                self.log.info("[raya] after restart on node {0}".format(node.name))
 
     def disrupt_toggle_auditing_state(self) -> None:
         """Manipulate auditing feature settings
@@ -3611,7 +3600,6 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         # need to make sure that there is a keyspace with a table filled with data
         keyspaces = self.cluster.get_test_keyspaces()
-        self.log.info("[raya] keyspaces: {0}, keyspaces type: {1}".format(keyspaces, type(keyspaces)))
         keyspaces_str = ','.join(keyspaces)
         self.log.info("[raya] keyspaces_str: {0}, keyspaces type: {1}".format(keyspaces_str, type(keyspaces)))
         if not keyspaces:
@@ -3619,18 +3607,12 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
 
         ks_cf = self.cluster.get_non_system_ks_cf_list(db_node=self.target_node)
         self.log.info("[raya] ks_cf is {0}, ks_cf type is {1}".format(ks_cf, type(ks_cf)))
-        #table = ks_cf[0]
         tables_str = ','.join(ks_cf)
         self.log.info("[raya] tables_str is {0} table type is {1}".format(tables_str, type(tables_str)))
 
         # check audit feature state on first node
         with self.target_node.remote_scylla_yaml() as scylla_yaml:
-            self.log.info("[raya] scylla_yaml on first node before update: {0}".format(scylla_yaml))
-            self.log.info("[raya] scylla_yaml.audit is {0}".format(scylla_yaml.audit))
-            # audit_state = False if scylla_yaml.audit is None else True
             audit_state = False if scylla_yaml.audit == 'none' else True
-            self.log.info("[raya] audit state on first node is {}".format(audit_state))
-        # audit_state = False
 
         audit_enabled_dict_for_scylla_yaml_1 = \
             {"audit": "table", "audit_categories": "AUTH,DML,DDL,DCL,QUERY,ADMIN",
@@ -3646,8 +3628,8 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
             self.log.info("[raya] inside if")
             self._update_audit_parameters_in_scylla_yaml(audit_enabled_dict_for_scylla_yaml_1)
 
-            self.log.info("[raya] sleeping {0} seconds".format(300))
-            time.sleep(300)
+            self.log.info("[raya] sleeping {0} seconds".format(60*15))
+            time.sleep(60*15)
 
             query_audit_table = f"SELECT * FROM audit.audit_log"
             result = self.target_node.run_cqlsh(query_audit_table)
